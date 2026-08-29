@@ -18,3 +18,19 @@ document.querySelector('#inspect').addEventListener('click', async () => {
     result.textContent = 'NotebookLMのページ読み込み後、もう一度ボタンを押してください。';
   }
 });
+
+document.querySelector('#create-inspect').addEventListener('click', async () => {
+  result.textContent = '新規作成画面を確認中…';
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tab = tabs[0];
+  if (!tab?.url?.startsWith('https://notebook.google.com/')) {
+    result.textContent = 'Gemini Notebookのホーム画面を前面にしてください。';
+    return;
+  }
+  try {
+    const snapshot = await chrome.tabs.sendMessage(tab.id, { type: 'amb:open-create-and-inspect' });
+    result.textContent = JSON.stringify(snapshot, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+});

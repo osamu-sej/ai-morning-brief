@@ -18,7 +18,24 @@ function inspectPage() {
   };
 }
 
+function findCreateButton() {
+  const buttons = Array.from(document.querySelectorAll('button'));
+  return buttons.find((button) => /新規作成|Create new/i.test(normalized(button.innerText || button.getAttribute('aria-label'))));
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'amb:inspect') return;
-  sendResponse(inspectPage());
+  if (message?.type === 'amb:inspect') {
+    sendResponse(inspectPage());
+    return;
+  }
+  if (message?.type === 'amb:open-create-and-inspect') {
+    const button = findCreateButton();
+    if (!button) {
+      sendResponse({ error: '「新規作成」ボタンが見つかりません。', snapshot: inspectPage() });
+      return;
+    }
+    button.click();
+    window.setTimeout(() => sendResponse(inspectPage()), 900);
+    return true;
+  }
 });
