@@ -23,6 +23,7 @@ import {
   writeBrief
 } from './pipeline.mjs';
 import { installSchedule, uninstallSchedule, writeScheduleDefinition } from './schedule.mjs';
+import { inspectNotebookLm, openNotebookLm } from './chrome.mjs';
 
 function parseArgs(args) {
   const positional = [];
@@ -42,7 +43,7 @@ function parseArgs(args) {
 }
 
 function usage() {
-  return `AI Morning Brief\n\n使い方:\n  npm run amb -- setup [--root PATH]\n  npm run amb -- doctor [--root PATH]\n  npm run amb -- add-x --image PATH [--url URL] [--date YYYY-MM-DD] [--root PATH]\n  npm run amb -- run [--date YYYY-MM-DD] [--dry-run] [--no-local-ai] [--root PATH]\n  npm run amb -- schedule write [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule install [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule uninstall [--root PATH]\n\n対象日の初期値は日本時間の前日です。`;
+  return `AI Morning Brief\n\n使い方:\n  npm run amb -- setup [--root PATH]\n  npm run amb -- doctor [--root PATH]\n  npm run amb -- add-x --image PATH [--url URL] [--date YYYY-MM-DD] [--root PATH]\n  npm run amb -- run [--date YYYY-MM-DD] [--dry-run] [--no-local-ai] [--root PATH]\n  npm run amb -- notebooklm open\n  npm run amb -- notebooklm inspect\n  npm run amb -- schedule write [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule install [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule uninstall [--root PATH]\n\n対象日の初期値は日本時間の前日です。`;
 }
 
 function appRoot(options) {
@@ -166,6 +167,20 @@ async function main() {
       return;
     }
     throw new Error('schedule のサブコマンドは write、install、uninstall です。');
+  }
+  if (command === 'notebooklm') {
+    const subcommand = positional.shift();
+    if (subcommand === 'open') {
+      await openNotebookLm();
+      console.log('通常のGoogle ChromeでNotebookLMを開きました。Googleログインが必要な場合はここで利用者が行ってください。');
+      return;
+    }
+    if (subcommand === 'inspect') {
+      const snapshot = await inspectNotebookLm();
+      console.log(JSON.stringify(snapshot, null, 2));
+      return;
+    }
+    throw new Error('notebooklm のサブコマンドは open または inspect です。');
   }
   throw new Error(`不明なコマンドです: ${command}`);
 }
