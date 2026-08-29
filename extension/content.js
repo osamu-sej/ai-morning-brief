@@ -76,8 +76,18 @@ function findAudioOverviewDialog() {
   return Array.from(document.querySelectorAll('[role="dialog"]')).find((item) => /音声解説をカスタマイズ|audio overview/i.test(normalized(item.innerText)));
 }
 
-function findGenerateAudioButton(dialog) {
-  return Array.from(dialog.querySelectorAll('button')).find((button) => normalized(button.innerText || button.getAttribute('aria-label')) === '生成');
+function findVisibleTextControl(text, scope = document) {
+  const candidates = Array.from(scope.querySelectorAll('button, [role="button"], [tabindex], *'))
+    .filter((item) => item.offsetParent)
+    .filter((item) => normalized(item.innerText || item.getAttribute('aria-label')) === text)
+    .map((item) => ({ item, rect: item.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width >= 48 && rect.height >= 24 && rect.width <= 500 && rect.height <= 240)
+    .sort((left, right) => (left.rect.width * left.rect.height) - (right.rect.width * right.rect.height));
+  return candidates[0]?.item ?? null;
+}
+
+function findGenerateAudioButton(dialog = document) {
+  return findVisibleTextControl('生成', dialog);
 }
 
 function sourceCount() {
@@ -95,11 +105,11 @@ function findAudioOverviewControl() {
   if (nativeControl) return nativeControl;
   const candidates = Array.from(document.querySelectorAll('[role="button"], [tabindex], *'))
     .filter((item) => item.offsetParent)
-    .filter((item) => pattern.test(normalized(item.innerText || item.getAttribute('aria-label'))));
-  return candidates.find((item) => normalized(item.innerText || item.getAttribute('aria-label')) === '音声解説')
-    ?? candidates.find((item) => item.matches('[role="button"], [tabindex]'))
-    ?? candidates.at(-1)
-    ?? null;
+    .filter((item) => pattern.test(normalized(item.innerText || item.getAttribute('aria-label'))))
+    .map((item) => ({ item, rect: item.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width >= 90 && rect.height >= 40 && rect.width <= 420 && rect.height <= 260)
+    .sort((left, right) => (left.rect.width * left.rect.height) - (right.rect.width * right.rect.height));
+  return candidates[0]?.item ?? null;
 }
 
 function waitFor(check, timeoutMs = 15_000, intervalMs = 250) {
@@ -163,9 +173,8 @@ async function requestAudioOverview() {
   const audioButton = findAudioOverviewControl();
   if (!audioButton) return { ok: false, error: '「音声解説」ボタンが見つかりません。' };
   await browserLevelClick(audioButton);
-  const audioDialog = await waitFor(findAudioOverviewDialog);
-  const generate = audioDialog && findGenerateAudioButton(audioDialog);
-  if (!audioDialog || !generate || generate.disabled) return { ok: false, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。' };
+  const generate = await waitFor(() => findGenerateAudioButton());
+  if (!generate || generate.disabled) return { ok: false, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。' };
   await browserLevelClick(generate);
   await new Promise((resolve) => window.setTimeout(resolve, 3000));
   return { ok: true, generationRequested: true };
