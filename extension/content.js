@@ -120,6 +120,8 @@ function visibleButtonMatching(pattern, scope = document) {
 }
 
 function findAudioOverviewControl() {
+  const labelledControl = document.querySelector('[role="button"][aria-label="音声解説"], [role="button"][aria-label="Audio Overview"]');
+  if (labelledControl?.offsetParent) return labelledControl;
   const pattern = /(^|\s)音声解説($|\s)|audio overview/i;
   const nativeControl = visibleButtonMatching(pattern);
   if (nativeControl) return nativeControl;
@@ -193,7 +195,7 @@ async function requestAudioOverview() {
   const audioButton = findAudioOverviewControl();
   if (!audioButton) return { ok: false, error: '「音声解説」ボタンが見つかりません。' };
   await browserLevelClick(audioButton);
-  const generate = await waitFor(() => findGenerateAudioButton());
+  const generate = await waitFor(() => findGenerateAudioButton(), 30_000);
   if (!generate || generate.disabled) return { ok: false, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。' };
   await browserLevelClick(generate);
   await new Promise((resolve) => window.setTimeout(resolve, 3000));
