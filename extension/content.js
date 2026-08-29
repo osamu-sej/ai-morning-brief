@@ -209,6 +209,11 @@ async function automateDailyNotebook({ title, sources }) {
     result.sources.push({ title: source.title, ...added });
     if (!added.ok) return { ...result, error: added.error, snapshot: inspectPage() };
   }
+  // Gemini Notebook updates the Studio controls asynchronously after a source is added.
+  // Waiting here avoids opening the audio dialog while that update is still in progress.
+  const audioControl = await waitFor(findAudioOverviewControl, 15_000);
+  if (!audioControl) return { ...result, error: 'ソース追加後に「音声解説」タイルが準備されませんでした。', snapshot: inspectPage() };
+  await new Promise((resolve) => window.setTimeout(resolve, 8_000));
   const audio = await requestAudioOverview();
   return audio.ok
     ? { ...result, generationRequested: true, snapshot: inspectPage() }
