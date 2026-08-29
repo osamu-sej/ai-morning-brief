@@ -125,6 +125,8 @@ async function addTextSource(text) {
   const insert = pasteDialog && findInsertButton(pasteDialog);
   if (!pasteDialog || !input || !insert) return { ok: false, error: '貼り付け入力欄または「挿入」ボタンが見つかりません。' };
   setInputValue(input, text);
+  await waitFor(() => !insert.disabled, 5_000);
+  await new Promise((resolve) => window.setTimeout(resolve, 750));
   insert.click();
   const inserted = await waitFor(() => !findPasteTextDialog() && sourceCount() > before, 25_000);
   return inserted
@@ -205,8 +207,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     setInputValue(input, message.text);
-    insert.click();
-    window.setTimeout(() => sendResponse({ inserted: true, snapshot: inspectPage() }), 4000);
+    window.setTimeout(() => {
+      insert.click();
+      window.setTimeout(() => sendResponse({ inserted: true, snapshot: inspectPage() }), 4000);
+    }, 750);
     return true;
   }
   if (message?.type === 'amb:generate-audio') {
