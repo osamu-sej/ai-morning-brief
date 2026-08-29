@@ -6,7 +6,11 @@ function inspectPage() {
   return {
     url: location.href,
     title: document.title,
-    buttons: Array.from(document.querySelectorAll('button')).map((item) => normalized(item.innerText || item.getAttribute('aria-label'))).filter(Boolean).slice(0, 100),
+    buttons: Array.from(document.querySelectorAll('button')).map((item) => ({
+      text: normalized(item.innerText || item.getAttribute('aria-label')),
+      disabled: item.disabled,
+      visible: Boolean(item.offsetParent)
+    })).filter((item) => item.text).slice(0, 100),
     inputs: Array.from(document.querySelectorAll('input')).map((item) => ({
       type: item.type,
       accept: item.accept || null,
@@ -14,6 +18,17 @@ function inspectPage() {
       visible: Boolean(item.offsetParent)
     })),
     dialogs: Array.from(document.querySelectorAll('[role="dialog"]')).map((item) => normalized(item.innerText).slice(0, 1500)),
+    editables: Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"]')).map((item) => ({
+      tag: item.tagName,
+      type: item.getAttribute('type'),
+      placeholder: item.getAttribute('placeholder'),
+      ariaLabel: item.getAttribute('aria-label'),
+      contenteditable: item.getAttribute('contenteditable'),
+      valueLength: (item.value ?? item.innerText ?? '').length,
+      visible: Boolean(item.offsetParent),
+      inDialog: Boolean(item.closest('[role="dialog"]')),
+      html: item.outerHTML.slice(0, 600)
+    })),
     text: normalized(document.body?.innerText).slice(0, 6000)
   };
 }
