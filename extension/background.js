@@ -1,5 +1,5 @@
 const NOTEBOOK_PATTERNS = ['https://notebooklm.google.com/*', 'https://notebook.google.com/*'];
-const NOTEBOOK_CREATE_URL = 'https://notebook.google.com/notebook/creating';
+const NOTEBOOK_HOME_URL = 'https://notebook.google.com/';
 const BRIDGE = 'http://127.0.0.1:8765';
 const DAILY_ALARM = 'amb:daily-notebook';
 
@@ -49,11 +49,11 @@ async function dailySources(expectedDate) {
   return articlePayload.articles.map(({ title, text }) => ({ title, text }));
 }
 
-async function sendWhenNotebookReady(tabId, message) {
+async function sendWhenReady(tabId, message, isReady) {
   let lastError = null;
   for (let attempt = 0; attempt < 45; attempt += 1) {
     const tab = await chrome.tabs.get(tabId).catch(() => null);
-    if (tab?.url?.startsWith('https://notebook.google.com/notebook/') && !tab.url.endsWith('/creating')) {
+    if (tab && isReady(tab.url)) {
       try {
         return await chrome.tabs.sendMessage(tabId, message);
       } catch (error) {
@@ -62,7 +62,7 @@ async function sendWhenNotebookReady(tabId, message) {
     }
     await sleep(1000);
   }
-  throw new Error(`新規Notebookの読み込みを待機中に失敗しました: ${lastError?.message ?? 'timeout'}`);
+  throw new Error(`Notebook画面の読み込みを待機中に失敗しました: ${lastError?.message ?? 'timeout'}`);
 }
 
 async function runDailyAutomation(trigger) {
@@ -70,12 +70,14 @@ async function runDailyAutomation(trigger) {
   await chrome.storage.local.set({ dailyStatus: { state: 'preparing', trigger, expectedDate, startedAt: new Date().toISOString() } });
   try {
     const sources = await dailySources(expectedDate);
-    const tab = await chrome.tabs.create({ url: NOTEBOOK_CREATE_URL, active: false });
-    const result = await sendWhenNotebookReady(tab.id, {
+    const tab = await chrome.tabs.create({ url: NOTEBOOK_HOME_URL, active: false });
+    const created = await sendWhenReady(tab.id, { type: 'amb:create-notebook' }, (url) => url === NOTEBOOK_HOME_URL || url?.startsWith(`${NOTEBOOK_HOME_URL}?`));
+    if (created?.error) throw new Error(created.error);
+    const result = await sendWhenReady(tab.id, {
       type: 'amb:automate-daily',
       title: `AI Morning Brief — ${expectedDate}`,
       sources
-    });
+    }, (url) => url?.startsWith('https://notebook.google.com/notebook/') && !url.endsWith('/creating'));
     const currentTab = await chrome.tabs.get(tab.id).catch(() => null);
     const status = {
       state: result.error ? 'needs_attention' : 'requested',

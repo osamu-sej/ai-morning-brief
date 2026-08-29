@@ -165,6 +165,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     window.setTimeout(() => sendResponse(inspectPage()), 900);
     return true;
   }
+  if (message?.type === 'amb:create-notebook') {
+    const button = findCreateButton();
+    if (!button) {
+      sendResponse({ error: '「新規作成」ボタンが見つかりません。', snapshot: inspectPage() });
+      return;
+    }
+    sendResponse({ creationRequested: true });
+    button.click();
+    return;
+  }
   if (message?.type === 'amb:open-source-and-inspect') {
     const button = findAddSourceButton();
     if (!button) {
