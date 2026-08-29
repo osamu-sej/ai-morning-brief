@@ -110,6 +110,18 @@ function setNotebookTitle(title) {
   return true;
 }
 
+async function browserLevelClick(button) {
+  const rect = button.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) throw new Error('クリック対象が画面上にありません。');
+  const response = await chrome.runtime.sendMessage({
+    type: 'amb:browser-level-click',
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2
+  });
+  if (response?.error) throw new Error(response.error);
+  return response;
+}
+
 async function addTextSource(text) {
   const before = sourceCount();
   const addSource = findAddSourceButton();
@@ -127,7 +139,7 @@ async function addTextSource(text) {
   setInputValue(input, text);
   await waitFor(() => !insert.disabled, 5_000);
   await new Promise((resolve) => window.setTimeout(resolve, 750));
-  insert.click();
+  await browserLevelClick(insert);
   const inserted = await waitFor(() => !findPasteTextDialog() && sourceCount() > before, 25_000);
   return inserted
     ? { ok: true, sourceCount: sourceCount() }
@@ -147,7 +159,7 @@ async function automateDailyNotebook({ title, sources }) {
   const audioDialog = await waitFor(findAudioOverviewDialog);
   const generate = audioDialog && findGenerateAudioButton(audioDialog);
   if (!audioDialog || !generate || generate.disabled) return { ...result, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。', snapshot: inspectPage() };
-  generate.click();
+  await browserLevelClick(generate);
   await new Promise((resolve) => window.setTimeout(resolve, 3000));
   return { ...result, generationRequested: true, snapshot: inspectPage() };
 }
@@ -208,8 +220,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     setInputValue(input, message.text);
     window.setTimeout(() => {
-      insert.click();
-      window.setTimeout(() => sendResponse({ inserted: true, snapshot: inspectPage() }), 4000);
+      browserLevelClick(insert)
+        .then(() => window.setTimeout(() => sendResponse({ inserted: true, snapshot: inspectPage() }), 4000))
+        .catch((error) => sendResponse({ error: error.message, snapshot: inspectPage() }));
     }, 750);
     return true;
   }
@@ -224,8 +237,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ error: '「生成」ボタンがまだ有効になっていません。', snapshot: inspectPage() });
       return;
     }
-    generate.click();
-    window.setTimeout(() => sendResponse({ generationRequested: true, snapshot: inspectPage() }), 3000);
+    browserLevelClick(generate)
+      .then(() => window.setTimeout(() => sendResponse({ generationRequested: true, snapshot: inspectPage() }), 3000))
+      .catch((error) => sendResponse({ error: error.message, snapshot: inspectPage() }));
     return true;
   }
   if (message?.type === 'amb:automate-daily') {

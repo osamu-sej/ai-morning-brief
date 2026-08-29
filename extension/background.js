@@ -37,6 +37,20 @@ async function readJson(url) {
   return response.json();
 }
 
+async function browserLevelClick(tabId, x, y) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('クリック座標が不正です。');
+  const target = { tabId };
+  await chrome.tabs.update(tabId, { active: true });
+  await chrome.debugger.attach(target, '1.3');
+  try {
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+    return { clicked: true };
+  } finally {
+    await chrome.debugger.detach(target).catch(() => {});
+  }
+}
+
 async function dailySources(expectedDate) {
   const [daily, articlePayload] = await Promise.all([
     readJson(`${BRIDGE}/v1/daily/latest`),
@@ -104,6 +118,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
+    if (message?.type === 'amb:browser-level-click') {
+      if (!sender.tab?.id) throw new Error('Notebookタブを特定できません。');
+      return browserLevelClick(sender.tab.id, message.x, message.y);
+    }
     if (message?.type === 'amb:active-notebooklm') {
       const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const activeTab = activeTabs[0];

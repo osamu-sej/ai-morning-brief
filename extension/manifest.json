@@ -3,7 +3,7 @@
   "name": "AI Morning Brief NotebookLM",
   "version": "0.1.0",
   "description": "NotebookLMの認証済み通常Chromeタブで、AI Morning Briefの自動投入を実行します。",
-  "permissions": ["storage", "alarms", "tabs"],
+  "permissions": ["storage", "alarms", "tabs", "debugger"],
   "host_permissions": [
     "https://notebooklm.google.com/*",
     "https://notebook.google.com/*",
