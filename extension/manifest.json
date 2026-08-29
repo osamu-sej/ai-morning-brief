@@ -6,6 +6,7 @@
   "permissions": ["storage", "alarms", "tabs"],
   "host_permissions": [
     "https://notebooklm.google.com/*",
+    "https://notebook.google.com/*",
     "http://127.0.0.1:8765/*"
   ],
   "action": {
@@ -18,7 +19,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://notebooklm.google.com/*"],
+      "matches": ["https://notebooklm.google.com/*", "https://notebook.google.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
