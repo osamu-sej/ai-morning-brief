@@ -22,7 +22,7 @@ import {
   ingestXImages,
   writeBrief
 } from './pipeline.mjs';
-import { installSchedule, uninstallSchedule, writeScheduleDefinition } from './schedule.mjs';
+import { installBridge, installSchedule, uninstallBridge, uninstallSchedule, writeBridgeDefinition, writeScheduleDefinition } from './schedule.mjs';
 import { inspectNotebookLm, openNotebookLm } from './chrome.mjs';
 import { serveBridge } from './bridge.mjs';
 
@@ -92,7 +92,7 @@ async function doctor(root) {
     ocr_binary: paths.ocr,
     ocr_binary_available: await access(paths.ocr).then(() => true).catch(() => false),
     scheduled_time: `${String(settings.schedule.hour).padStart(2, '0')}:${String(settings.schedule.minute).padStart(2, '0')}`,
-    notebooklm_handoff: '通常のChromeで日次Markdownを手動投入'
+    notebooklm_handoff: '通常のChrome拡張機能が日次資料をNotebookへ投入し、音声解説を生成'
   };
   console.log(JSON.stringify(checks, null, 2));
 }
@@ -153,17 +153,21 @@ async function main() {
     }
     const cli = fileURLToPath(new URL('./cli.mjs', import.meta.url));
     const definition = await writeScheduleDefinition({ root, node: process.execPath, cli, hour, minute });
+    const bridgeDefinition = await writeBridgeDefinition({ root, node: process.execPath, cli });
     if (subcommand === 'write') {
       console.log(`launchd定義を作成しました: ${definition}`);
       return;
     }
     if (subcommand === 'install') {
       const target = await installSchedule(definition, process.env.HOME);
+      const bridgeTarget = await installBridge(bridgeDefinition, process.env.HOME);
       console.log(`毎日${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}の自動実行を登録しました: ${target}`);
+      console.log(`ローカルブリッジを常時起動にしました: ${bridgeTarget}`);
       return;
     }
     if (subcommand === 'uninstall') {
       const target = await uninstallSchedule(process.env.HOME);
+      await uninstallBridge(process.env.HOME);
       console.log(`自動実行を解除しました: ${target}`);
       return;
     }

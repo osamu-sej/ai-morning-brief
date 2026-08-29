@@ -1,6 +1,6 @@
 # AI Morning Brief
 
-無料・外部APIなしで、前日のAI関連情報をローカルで整理し、NotebookLMへ手動投入する日次資料を作るmacOS向けツールです。
+無料・外部APIなしで、前日のAI関連情報をローカルで整理し、通常のChromeにあるGemini Notebookへ記事ごとに追加して音声解説を生成するmacOS向けツールです。
 
 ## 現在の実装範囲
 
@@ -9,8 +9,10 @@
 - macOS Vision OCRヘルパー（ローカル実行）
 - 手動投入した記事テキストの取り込み
 - Ollama上の`gemma4:12b-mlx`による根拠付きJSON要約（利用不可時はルールベースへ縮退）
-- 記事ごとのMarkdownと、NotebookLMへ投入する日次Markdownの生成
+- 記事ごとのMarkdownと日次Markdownの生成
 - macOSの`launchd`による毎朝5時の自動実行
+- Chrome拡張機能による、新規Gemini Notebook作成・記事ごとのテキスト追加・音声解説生成リクエスト
+- ローカルブリッジの常時起動（`127.0.0.1`のみ）
 - 実行環境診断とドライラン
 
 Xをツールが自動巡回・撮影する機能は含めません。利用者が保存した画像を入力にします。
@@ -57,9 +59,13 @@ npm run amb -- schedule install --hour 5 --minute 0
 npm run amb -- schedule uninstall
 ```
 
-## NotebookLMへの渡し方
+## Gemini Notebookの自動処理
 
-GoogleログインとNotebookLM操作は、通常のChromeで行います。日次処理後に出力される`runtime/daily/YYYY-MM-DD/daily_brief_YYYY-MM-DD.md`をNotebookLMへソースとして追加し、標準の「音声解説を生成」を選んでください。認証情報・Cookieの抽出や移植、ログインの自動化は行いません。
+`extension/`をChromeの「パッケージ化されていない拡張機能を読み込む」から登録します。通常のChromeでGemini Notebookへ一度ログインした状態で、拡張機能の「毎朝5時の自動実行を有効化」を押してください。
+
+毎朝5時に`launchd`が前日分を処理し、Chrome拡張機能が新規Notebookを作成します。選定記事を1件ずつテキストソースとして追加後、標準の音声解説生成を依頼します。Chromeが起動しており、Macがスリープしていないことが実行条件です。音声の完成時間はGemini Notebook側の処理状況に依存します。
+
+拡張機能はログイン情報・Cookieを取得、保存、移植しません。Googleの通常ログイン済みChromeセッションの画面操作のみを使います。
 
 対象日の初期値は日本時間の前日です。境界時刻を含む日付計算は自動テストで検証します。
 

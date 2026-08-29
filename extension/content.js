@@ -80,6 +80,76 @@ function findGenerateAudioButton(dialog) {
   return Array.from(dialog.querySelectorAll('button')).find((button) => normalized(button.innerText || button.getAttribute('aria-label')) === '生成');
 }
 
+function sourceCount() {
+  const match = normalized(document.body?.innerText).match(/(\d+)\s*件のソース/);
+  return match ? Number(match[1]) : 0;
+}
+
+function visibleButtonMatching(pattern, scope = document) {
+  return Array.from(scope.querySelectorAll('button')).find((button) => button.offsetParent && pattern.test(normalized(button.innerText || button.getAttribute('aria-label'))));
+}
+
+function waitFor(check, timeoutMs = 15_000, intervalMs = 250) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const poll = () => {
+      const value = check();
+      if (value) return resolve(value);
+      if (Date.now() - startedAt >= timeoutMs) return resolve(null);
+      window.setTimeout(poll, intervalMs);
+    };
+    poll();
+  });
+}
+
+function setNotebookTitle(title) {
+  const input = document.querySelector('input.title-input');
+  if (!input || !title) return false;
+  setInputValue(input, title);
+  input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+  return true;
+}
+
+async function addTextSource(text) {
+  const before = sourceCount();
+  const addSource = findAddSourceButton();
+  if (!addSource) return { ok: false, error: '「ソースを追加」ボタンが見つかりません。' };
+  addSource.click();
+  const sourceDialog = await waitFor(() => Array.from(document.querySelectorAll('[role="dialog"]')).find((item) => /コピーしたテキスト|Copy pasted text/i.test(normalized(item.innerText))));
+  if (!sourceDialog) return { ok: false, error: 'ソースの追加画面が開きませんでした。' };
+  const copyText = visibleButtonMatching(/コピーしたテキスト|Copy pasted text/i, sourceDialog);
+  if (!copyText) return { ok: false, error: '「コピーしたテキスト」選択肢が見つかりません。' };
+  copyText.click();
+  const pasteDialog = await waitFor(findPasteTextDialog);
+  const input = pasteDialog?.querySelector('textarea, input[type="text"], [contenteditable="true"]');
+  const insert = pasteDialog && findInsertButton(pasteDialog);
+  if (!pasteDialog || !input || !insert) return { ok: false, error: '貼り付け入力欄または「挿入」ボタンが見つかりません。' };
+  setInputValue(input, text);
+  insert.click();
+  const inserted = await waitFor(() => !findPasteTextDialog() && sourceCount() > before, 25_000);
+  return inserted
+    ? { ok: true, sourceCount: sourceCount() }
+    : { ok: false, error: 'ソース追加の完了を25秒以内に確認できませんでした。', sourceCount: sourceCount() };
+}
+
+async function automateDailyNotebook({ title, sources }) {
+  const result = { titleSet: setNotebookTitle(title), sources: [] };
+  for (const source of sources) {
+    const added = await addTextSource(source.text);
+    result.sources.push({ title: source.title, ...added });
+    if (!added.ok) return { ...result, error: added.error, snapshot: inspectPage() };
+  }
+  const audioButton = visibleButtonMatching(/(^|\s)音声解説($|\s)|audio overview/i);
+  if (!audioButton) return { ...result, error: '「音声解説」ボタンが見つかりません。', snapshot: inspectPage() };
+  audioButton.click();
+  const audioDialog = await waitFor(findAudioOverviewDialog);
+  const generate = audioDialog && findGenerateAudioButton(audioDialog);
+  if (!audioDialog || !generate || generate.disabled) return { ...result, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。', snapshot: inspectPage() };
+  generate.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 3000));
+  return { ...result, generationRequested: true, snapshot: inspectPage() };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'amb:inspect') {
     sendResponse(inspectPage());
@@ -142,6 +212,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     generate.click();
     window.setTimeout(() => sendResponse({ generationRequested: true, snapshot: inspectPage() }), 3000);
+    return true;
+  }
+  if (message?.type === 'amb:automate-daily') {
+    automateDailyNotebook({ title: message.title, sources: message.sources ?? [] })
+      .then(sendResponse)
+      .catch((error) => sendResponse({ error: error.message, snapshot: inspectPage() }));
     return true;
   }
 });

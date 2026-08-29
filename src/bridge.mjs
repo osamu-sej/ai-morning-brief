@@ -31,6 +31,18 @@ export async function latestDailyPayload(root) {
   };
 }
 
+export async function latestDailyArticlesPayload(root) {
+  const latest = await latestDailyRun(root);
+  if (!latest) return null;
+  const articles = await Promise.all((latest.run.selected ?? []).map(async ({ rank, title, output_file }) => ({
+    rank,
+    title,
+    filename: path.basename(output_file),
+    text: await readFile(output_file, 'utf8')
+  })));
+  return { date: latest.date, articles };
+}
+
 function sendJson(response, status, value) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   response.end(`${JSON.stringify(value)}\n`);
@@ -42,6 +54,10 @@ export function createBridgeServer(root) {
     if (request.url === '/health') return sendJson(response, 200, { status: 'ok' });
     if (request.url === '/v1/daily/latest') {
       const payload = await latestDailyPayload(root);
+      return payload ? sendJson(response, 200, payload) : sendJson(response, 404, { error: 'daily_brief_not_found' });
+    }
+    if (request.url === '/v1/daily/latest/articles') {
+      const payload = await latestDailyArticlesPayload(root);
       return payload ? sendJson(response, 200, payload) : sendJson(response, 404, { error: 'daily_brief_not_found' });
     }
     return sendJson(response, 404, { error: 'not_found' });

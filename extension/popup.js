@@ -99,3 +99,25 @@ document.querySelector('#generate-audio').addEventListener('click', async () => 
     result.textContent = `エラー: ${error.message}`;
   }
 });
+
+async function showDailyResponse(message, waiting) {
+  result.textContent = waiting;
+  try {
+    const response = await chrome.runtime.sendMessage(message);
+    result.textContent = JSON.stringify(response, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+}
+
+document.querySelector('#run-daily-now').addEventListener('click', () => {
+  showDailyResponse({ type: 'amb:run-daily-now' }, '新規Notebookを作成し、記事ごとの投入と音声解説生成を実行中…');
+});
+
+document.querySelector('#enable-daily').addEventListener('click', () => {
+  showDailyResponse({ type: 'amb:enable-daily' }, '毎朝5時の自動実行を登録中…');
+});
+
+document.querySelector('#daily-status').addEventListener('click', () => {
+  showDailyResponse({ type: 'amb:daily-status' }, '日次自動実行の状態を確認中…');
+});
