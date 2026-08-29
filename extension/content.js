@@ -23,6 +23,10 @@ function findCreateButton() {
   return buttons.find((button) => /新規作成|Create new/i.test(normalized(button.innerText || button.getAttribute('aria-label'))));
 }
 
+function findAddSourceButton() {
+  return Array.from(document.querySelectorAll('button')).find((button) => /ソースを追加|Add source/i.test(normalized(button.innerText || button.getAttribute('aria-label'))));
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'amb:inspect') {
     sendResponse(inspectPage());
@@ -32,6 +36,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const button = findCreateButton();
     if (!button) {
       sendResponse({ error: '「新規作成」ボタンが見つかりません。', snapshot: inspectPage() });
+      return;
+    }
+    button.click();
+    window.setTimeout(() => sendResponse(inspectPage()), 900);
+    return true;
+  }
+  if (message?.type === 'amb:open-source-and-inspect') {
+    const button = findAddSourceButton();
+    if (!button) {
+      sendResponse({ error: '「ソースを追加」ボタンが見つかりません。', snapshot: inspectPage() });
       return;
     }
     button.click();

@@ -34,3 +34,19 @@ document.querySelector('#create-inspect').addEventListener('click', async () => 
     result.textContent = `エラー: ${error.message}`;
   }
 });
+
+document.querySelector('#source-inspect').addEventListener('click', async () => {
+  result.textContent = 'ソース追加画面を確認中…';
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tab = tabs[0];
+  if (!tab?.url?.startsWith('https://notebook.google.com/notebook/')) {
+    result.textContent = '対象のGemini Notebookを前面にしてください。';
+    return;
+  }
+  try {
+    const snapshot = await chrome.tabs.sendMessage(tab.id, { type: 'amb:open-source-and-inspect' });
+    result.textContent = JSON.stringify(snapshot, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+});
