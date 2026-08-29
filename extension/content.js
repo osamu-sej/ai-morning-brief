@@ -159,6 +159,18 @@ async function addTextSource(text) {
     : { ok: false, error: 'ソース追加の完了を25秒以内に確認できませんでした。', sourceCount: sourceCount() };
 }
 
+async function requestAudioOverview() {
+  const audioButton = findAudioOverviewControl();
+  if (!audioButton) return { ok: false, error: '「音声解説」ボタンが見つかりません。' };
+  await browserLevelClick(audioButton);
+  const audioDialog = await waitFor(findAudioOverviewDialog);
+  const generate = audioDialog && findGenerateAudioButton(audioDialog);
+  if (!audioDialog || !generate || generate.disabled) return { ok: false, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。' };
+  await browserLevelClick(generate);
+  await new Promise((resolve) => window.setTimeout(resolve, 3000));
+  return { ok: true, generationRequested: true };
+}
+
 async function automateDailyNotebook({ title, sources }) {
   const result = { titleSet: setNotebookTitle(title), sources: [] };
   for (const source of sources) {
@@ -166,15 +178,10 @@ async function automateDailyNotebook({ title, sources }) {
     result.sources.push({ title: source.title, ...added });
     if (!added.ok) return { ...result, error: added.error, snapshot: inspectPage() };
   }
-  const audioButton = findAudioOverviewControl();
-  if (!audioButton) return { ...result, error: '「音声解説」ボタンが見つかりません。', snapshot: inspectPage() };
-  audioButton.click();
-  const audioDialog = await waitFor(findAudioOverviewDialog);
-  const generate = audioDialog && findGenerateAudioButton(audioDialog);
-  if (!audioDialog || !generate || generate.disabled) return { ...result, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。', snapshot: inspectPage() };
-  await browserLevelClick(generate);
-  await new Promise((resolve) => window.setTimeout(resolve, 3000));
-  return { ...result, generationRequested: true, snapshot: inspectPage() };
+  const audio = await requestAudioOverview();
+  return audio.ok
+    ? { ...result, generationRequested: true, snapshot: inspectPage() }
+    : { ...result, error: audio.error, snapshot: inspectPage() };
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -252,6 +259,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     browserLevelClick(generate)
       .then(() => window.setTimeout(() => sendResponse({ generationRequested: true, snapshot: inspectPage() }), 3000))
+      .catch((error) => sendResponse({ error: error.message, snapshot: inspectPage() }));
+    return true;
+  }
+  if (message?.type === 'amb:start-audio') {
+    requestAudioOverview()
+      .then((result) => sendResponse({ ...result, snapshot: inspectPage() }))
       .catch((error) => sendResponse({ error: error.message, snapshot: inspectPage() }));
     return true;
   }

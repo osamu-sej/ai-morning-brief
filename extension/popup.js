@@ -100,6 +100,19 @@ document.querySelector('#generate-audio').addEventListener('click', async () => 
   }
 });
 
+document.querySelector('#start-audio').addEventListener('click', async () => {
+  result.textContent = '音声解説の設定と生成を開始中…';
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (!tab?.url?.startsWith('https://notebook.google.com/notebook/')) throw new Error('対象のGemini Notebookを前面にしてください。');
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'amb:start-audio' });
+    result.textContent = JSON.stringify(response, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+});
+
 async function showDailyResponse(message, waiting) {
   result.textContent = waiting;
   try {
