@@ -6,12 +6,16 @@ async function activeNotebookLmTab() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'amb:open-or-inspect') return;
+  if (message?.type !== 'amb:active-notebooklm') return;
   (async () => {
-    let tab = await activeNotebookLmTab();
-    if (!tab) tab = await chrome.tabs.create({ url: 'https://notebooklm.google.com/' });
-    await chrome.tabs.update(tab.id, { active: true });
-    sendResponse({ tabId: tab.id, opened: true });
+    const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = activeTabs[0];
+    if (activeTab?.url?.startsWith('https://notebooklm.google.com/')) {
+      sendResponse({ tabId: activeTab.id });
+      return;
+    }
+    const tab = await activeNotebookLmTab();
+    sendResponse(tab ? { tabId: tab.id, inactive: true } : { error: 'NotebookLMのタブを開いてから、もう一度実行してください。' });
   })().catch((error) => sendResponse({ error: error.message }));
   return true;
 });
