@@ -24,6 +24,7 @@ import {
 } from './pipeline.mjs';
 import { installSchedule, uninstallSchedule, writeScheduleDefinition } from './schedule.mjs';
 import { inspectNotebookLm, openNotebookLm } from './chrome.mjs';
+import { serveBridge } from './bridge.mjs';
 
 function parseArgs(args) {
   const positional = [];
@@ -43,7 +44,7 @@ function parseArgs(args) {
 }
 
 function usage() {
-  return `AI Morning Brief\n\n使い方:\n  npm run amb -- setup [--root PATH]\n  npm run amb -- doctor [--root PATH]\n  npm run amb -- add-x --image PATH [--url URL] [--date YYYY-MM-DD] [--root PATH]\n  npm run amb -- run [--date YYYY-MM-DD] [--dry-run] [--no-local-ai] [--root PATH]\n  npm run amb -- notebooklm open\n  npm run amb -- notebooklm inspect\n  npm run amb -- schedule write [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule install [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule uninstall [--root PATH]\n\n対象日の初期値は日本時間の前日です。`;
+  return `AI Morning Brief\n\n使い方:\n  npm run amb -- setup [--root PATH]\n  npm run amb -- doctor [--root PATH]\n  npm run amb -- add-x --image PATH [--url URL] [--date YYYY-MM-DD] [--root PATH]\n  npm run amb -- run [--date YYYY-MM-DD] [--dry-run] [--no-local-ai] [--root PATH]\n  npm run amb -- bridge serve [--port 8765] [--root PATH]\n  npm run amb -- notebooklm open\n  npm run amb -- notebooklm inspect\n  npm run amb -- schedule write [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule install [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule uninstall [--root PATH]\n\n対象日の初期値は日本時間の前日です。`;
 }
 
 function appRoot(options) {
@@ -181,6 +182,16 @@ async function main() {
       return;
     }
     throw new Error('notebooklm のサブコマンドは open または inspect です。');
+  }
+  if (command === 'bridge') {
+    const subcommand = positional.shift();
+    if (subcommand !== 'serve') throw new Error('bridge のサブコマンドは serve です。');
+    const port = Number(options.port ?? 8765);
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('--port は1024〜65535で指定してください。');
+    const server = await serveBridge(root, port);
+    console.log(`ローカルブリッジを起動しました: http://127.0.0.1:${port}`);
+    process.once('SIGINT', () => server.close(() => process.exit(0)));
+    return;
   }
   throw new Error(`不明なコマンドです: ${command}`);
 }
