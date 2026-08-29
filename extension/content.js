@@ -89,6 +89,19 @@ function visibleButtonMatching(pattern, scope = document) {
   return Array.from(scope.querySelectorAll('button')).find((button) => button.offsetParent && pattern.test(normalized(button.innerText || button.getAttribute('aria-label'))));
 }
 
+function findAudioOverviewControl() {
+  const pattern = /(^|\s)音声解説($|\s)|audio overview/i;
+  const nativeControl = visibleButtonMatching(pattern);
+  if (nativeControl) return nativeControl;
+  const candidates = Array.from(document.querySelectorAll('[role="button"], [tabindex], *'))
+    .filter((item) => item.offsetParent)
+    .filter((item) => pattern.test(normalized(item.innerText || item.getAttribute('aria-label'))));
+  return candidates.find((item) => normalized(item.innerText || item.getAttribute('aria-label')) === '音声解説')
+    ?? candidates.find((item) => item.matches('[role="button"], [tabindex]'))
+    ?? candidates.at(-1)
+    ?? null;
+}
+
 function waitFor(check, timeoutMs = 15_000, intervalMs = 250) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
@@ -153,7 +166,7 @@ async function automateDailyNotebook({ title, sources }) {
     result.sources.push({ title: source.title, ...added });
     if (!added.ok) return { ...result, error: added.error, snapshot: inspectPage() };
   }
-  const audioButton = visibleButtonMatching(/(^|\s)音声解説($|\s)|audio overview/i);
+  const audioButton = findAudioOverviewControl();
   if (!audioButton) return { ...result, error: '「音声解説」ボタンが見つかりません。', snapshot: inspectPage() };
   audioButton.click();
   const audioDialog = await waitFor(findAudioOverviewDialog);
