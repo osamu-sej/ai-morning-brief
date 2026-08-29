@@ -86,3 +86,16 @@ document.querySelector('#paste-latest').addEventListener('click', async () => {
     result.textContent = `エラー: ${error.message}`;
   }
 });
+
+document.querySelector('#generate-audio').addEventListener('click', async () => {
+  result.textContent = '音声解説の生成を開始中…';
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (!tab?.url?.startsWith('https://notebook.google.com/notebook/')) throw new Error('対象のGemini Notebookを前面にしてください。');
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'amb:generate-audio' });
+    result.textContent = JSON.stringify(response, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+});

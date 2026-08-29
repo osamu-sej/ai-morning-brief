@@ -72,6 +72,14 @@ function findInsertButton(dialog) {
   return Array.from(dialog.querySelectorAll('button')).find((button) => normalized(button.innerText || button.getAttribute('aria-label')) === '挿入');
 }
 
+function findAudioOverviewDialog() {
+  return Array.from(document.querySelectorAll('[role="dialog"]')).find((item) => /音声解説をカスタマイズ|audio overview/i.test(normalized(item.innerText)));
+}
+
+function findGenerateAudioButton(dialog) {
+  return Array.from(dialog.querySelectorAll('button')).find((button) => normalized(button.innerText || button.getAttribute('aria-label')) === '生成');
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'amb:inspect') {
     sendResponse(inspectPage());
@@ -119,6 +127,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     setInputValue(input, message.text);
     insert.click();
     window.setTimeout(() => sendResponse({ inserted: true, snapshot: inspectPage() }), 4000);
+    return true;
+  }
+  if (message?.type === 'amb:generate-audio') {
+    const dialog = findAudioOverviewDialog();
+    const generate = dialog && findGenerateAudioButton(dialog);
+    if (!dialog || !generate) {
+      sendResponse({ error: '音声解説の設定画面または「生成」ボタンが見つかりません。', snapshot: inspectPage() });
+      return;
+    }
+    if (generate.disabled) {
+      sendResponse({ error: '「生成」ボタンがまだ有効になっていません。', snapshot: inspectPage() });
+      return;
+    }
+    generate.click();
+    window.setTimeout(() => sendResponse({ generationRequested: true, snapshot: inspectPage() }), 3000);
     return true;
   }
 });
