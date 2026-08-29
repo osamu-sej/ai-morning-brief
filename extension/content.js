@@ -2,6 +2,25 @@ function normalized(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
 }
 
+function audioOverviewCandidates() {
+  const pattern = /(^|\s)音声解説($|\s)|audio overview/i;
+  return Array.from(document.querySelectorAll('*'))
+    .filter((item) => item.offsetParent)
+    .filter((item) => pattern.test(normalized(item.innerText || item.getAttribute('aria-label'))))
+    .map((item) => {
+      const rect = item.getBoundingClientRect();
+      return {
+        tag: item.tagName,
+        role: item.getAttribute('role'),
+        tabIndex: item.getAttribute('tabindex'),
+        text: normalized(item.innerText || item.getAttribute('aria-label')),
+        rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+        html: item.outerHTML.slice(0, 700)
+      };
+    })
+    .slice(0, 30);
+}
+
 function inspectPage() {
   return {
     url: location.href,
@@ -18,6 +37,7 @@ function inspectPage() {
       visible: Boolean(item.offsetParent)
     })),
     dialogs: Array.from(document.querySelectorAll('[role="dialog"]')).map((item) => normalized(item.innerText).slice(0, 1500)),
+    audioOverviewCandidates: audioOverviewCandidates(),
     editables: Array.from(document.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"]')).map((item) => ({
       tag: item.tagName,
       type: item.getAttribute('type'),
@@ -196,6 +216,10 @@ async function automateDailyNotebook({ title, sources }) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'amb:inspect') {
     sendResponse(inspectPage());
+    return;
+  }
+  if (message?.type === 'amb:audio-diagnostics') {
+    sendResponse({ url: location.href, audioOverviewCandidates: audioOverviewCandidates(), dialogs: inspectPage().dialogs });
     return;
   }
   if (message?.type === 'amb:open-create-and-inspect') {

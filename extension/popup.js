@@ -19,6 +19,19 @@ document.querySelector('#inspect').addEventListener('click', async () => {
   }
 });
 
+document.querySelector('#audio-diagnostics').addEventListener('click', async () => {
+  result.textContent = '音声解説タイルを確認中…';
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (!tab?.url?.startsWith('https://notebook.google.com/notebook/')) throw new Error('対象のGemini Notebookを前面にしてください。');
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'amb:audio-diagnostics' });
+    result.textContent = JSON.stringify(response, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+});
+
 document.querySelector('#create-inspect').addEventListener('click', async () => {
   result.textContent = '新規作成画面を確認中…';
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
