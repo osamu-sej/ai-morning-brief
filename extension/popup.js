@@ -68,3 +68,21 @@ document.querySelector('#upload-latest').addEventListener('click', async () => {
     result.textContent = `エラー: ${error.message}`;
   }
 });
+
+document.querySelector('#paste-latest').addEventListener('click', async () => {
+  result.textContent = 'ローカル日次資料を取得中…';
+  try {
+    const daily = await fetch('http://127.0.0.1:8765/v1/daily/latest').then(async (response) => {
+      if (!response.ok) throw new Error(`ローカルブリッジ: ${response.status}`);
+      return response.json();
+    });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (!tab?.url?.startsWith('https://notebook.google.com/notebook/')) throw new Error('対象のGemini Notebookを前面にしてください。');
+    result.textContent = 'Notebookへテキストを追加中…';
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'amb:paste-markdown', text: daily.text });
+    result.textContent = JSON.stringify(response, null, 2);
+  } catch (error) {
+    result.textContent = `エラー: ${error.message}`;
+  }
+});

@@ -42,6 +42,21 @@ function dispatchDrop(target, file) {
   }
 }
 
+function findPasteTextDialog() {
+  return Array.from(document.querySelectorAll('[role="dialog"]')).find((item) => /コピーしたテキストを貼り付ける/i.test(normalized(item.innerText)));
+}
+
+function setInputValue(input, value) {
+  const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(prototype, 'value').set.call(input, value);
+  input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function findInsertButton(dialog) {
+  return Array.from(dialog.querySelectorAll('button')).find((button) => normalized(button.innerText || button.getAttribute('aria-label')) === '挿入');
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'amb:inspect') {
     sendResponse(inspectPage());
@@ -76,6 +91,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const file = new File([message.text], message.filename, { type: 'text/markdown' });
     targets.forEach((target) => dispatchDrop(target, file));
     window.setTimeout(() => sendResponse({ dropped: true, targetCount: targets.length, snapshot: inspectPage() }), 2500);
+    return true;
+  }
+  if (message?.type === 'amb:paste-markdown') {
+    const dialog = findPasteTextDialog();
+    const input = dialog?.querySelector('textarea, input[type="text"], [contenteditable="true"]');
+    const insert = dialog && findInsertButton(dialog);
+    if (!dialog || !input || !insert) {
+      sendResponse({ error: 'コピーしたテキストの入力欄または「挿入」ボタンが見つかりません。', snapshot: inspectPage() });
+      return;
+    }
+    setInputValue(input, message.text);
+    insert.click();
+    window.setTimeout(() => sendResponse({ inserted: true, snapshot: inspectPage() }), 4000);
     return true;
   }
 });
