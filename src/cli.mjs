@@ -23,7 +23,7 @@ import {
   ingestXImages,
   writeBrief
 } from './pipeline.mjs';
-import { installBridge, installSchedule, uninstallBridge, uninstallSchedule, writeBridgeDefinition, writeScheduleDefinition } from './schedule.mjs';
+import { installBridge, installChrome, installSchedule, uninstallBridge, uninstallChrome, uninstallSchedule, writeBridgeDefinition, writeChromeDefinition, writeScheduleDefinition } from './schedule.mjs';
 import { inspectNotebookLm, openNotebookLm } from './chrome.mjs';
 import { serveBridge } from './bridge.mjs';
 import { collectPublicCandidates } from './collectors.mjs';
@@ -166,6 +166,9 @@ async function main() {
     const cli = fileURLToPath(new URL('./cli.mjs', import.meta.url));
     const definition = await writeScheduleDefinition({ root, node: process.execPath, cli, hour, minute });
     const bridgeDefinition = await writeBridgeDefinition({ root, node: process.execPath, cli });
+    const chromeMinute = (minute + 9) % 60;
+    const chromeHour = (hour + Math.floor((minute + 9) / 60)) % 24;
+    const chromeDefinition = await writeChromeDefinition({ root, hour: chromeHour, minute: chromeMinute });
     if (subcommand === 'write') {
       console.log(`launchd定義を作成しました: ${definition}`);
       return;
@@ -173,13 +176,16 @@ async function main() {
     if (subcommand === 'install') {
       const target = await installSchedule(definition, process.env.HOME);
       const bridgeTarget = await installBridge(bridgeDefinition, process.env.HOME);
+      const chromeTarget = await installChrome(chromeDefinition, process.env.HOME);
       console.log(`毎日${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}の自動実行を登録しました: ${target}`);
       console.log(`ローカルブリッジを常時起動にしました: ${bridgeTarget}`);
+      console.log(`毎日${String(chromeHour).padStart(2, '0')}:${String(chromeMinute).padStart(2, '0')}にGoogle Chromeを起動します: ${chromeTarget}`);
       return;
     }
     if (subcommand === 'uninstall') {
       const target = await uninstallSchedule(process.env.HOME);
       await uninstallBridge(process.env.HOME);
+      await uninstallChrome(process.env.HOME);
       console.log(`自動実行を解除しました: ${target}`);
       return;
     }

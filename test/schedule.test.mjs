@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bridgeLaunchdPlist, launchdPlist } from '../src/schedule.mjs';
+import { bridgeLaunchdPlist, chromeLaunchdPlist, launchdPlist } from '../src/schedule.mjs';
 
 test('launchd definition starts the local CLI at the requested time', () => {
   const plist = launchdPlist({
@@ -21,4 +21,11 @@ test('bridge launchd definition keeps the local bridge available', () => {
   assert.match(definition, /bridge/);
   assert.match(definition, /<key>RunAtLoad<\/key><true\/>/);
   assert.match(definition, /<key>KeepAlive<\/key><true\/>/);
+});
+
+test('Chrome launcher opens Chrome before Notebook automation', () => {
+  const definition = chromeLaunchdPlist({ hour: 5, minute: 9 });
+  assert.match(definition, /Google Chrome/);
+  assert.match(definition, /<integer>5<\/integer>/);
+  assert.match(definition, /<integer>9<\/integer>/);
 });

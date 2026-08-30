@@ -243,10 +243,14 @@ function engagementValue(engagement) {
 export function scoreCandidate(candidate) {
   const textScore = Math.min(candidate.raw_text.length / 1200, 1) * 22;
   const sourceScore = candidate.source_url ? 14 : 4;
+  const publisher = String(candidate.metadata?.publisher ?? '').toLowerCase();
+  const trustedPublisher = /(?:nikkei|日経|itmedia|impress|ledge|ascii|cnet|zdnet|wired|techcrunch|publickey|codezine|nhk|朝日|読売|毎日|共同通信|東洋経済|business insider)/i.test(publisher);
+  const lowSignal = /(?:pr times|ニコニコ|infoseek|biggo|mshale|koubo)/i.test(publisher);
+  const editorialScore = candidate.source_type === 'top_runner_news' ? 16 : trustedPublisher ? 12 : lowSignal ? -12 : 0;
   const engagementScore = Math.min(Math.log10(engagementValue(candidate.engagement) + 1) * 9, 24);
   const confidenceScore = Math.min((candidate.ocr_confidence ?? 1) * 10, 10);
   const qualityPenalty = (candidate.quality_flags ?? []).length * 4 + (candidate.needs_review ? 8 : 0);
-  return Math.max(0, Math.round((textScore + sourceScore + engagementScore + confidenceScore - qualityPenalty) * 10) / 10);
+  return Math.max(0, Math.round((textScore + sourceScore + editorialScore + engagementScore + confidenceScore - qualityPenalty) * 10) / 10);
 }
 
 export function dedupeAndRank(candidates, settings) {

@@ -83,9 +83,9 @@ export function defaultSettings(root) {
     },
     collection: {
       enabled: true,
-      githubLimit: 10,
-      hackerNewsLimit: 10,
-      googleNewsPerQuery: 6
+      githubLimit: 3,
+      googleNewsPerQuery: 8,
+      topRunnerLimit: 4
     },
     notebooklm: {
       language: 'Japanese',
