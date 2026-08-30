@@ -18,6 +18,7 @@ import {
   addXImage,
   dedupeAndRank,
   enrichCandidates,
+  fallbackAnalysis,
   ingestManualArticles,
   ingestXImages,
   writeBrief
@@ -25,6 +26,7 @@ import {
 import { installBridge, installSchedule, uninstallBridge, uninstallSchedule, writeBridgeDefinition, writeScheduleDefinition } from './schedule.mjs';
 import { inspectNotebookLm, openNotebookLm } from './chrome.mjs';
 import { serveBridge } from './bridge.mjs';
+import { collectPublicCandidates } from './collectors.mjs';
 
 function parseArgs(args) {
   const positional = [];
@@ -44,7 +46,7 @@ function parseArgs(args) {
 }
 
 function usage() {
-  return `AI Morning Brief\n\n使い方:\n  npm run amb -- setup [--root PATH]\n  npm run amb -- doctor [--root PATH]\n  npm run amb -- add-x --image PATH [--url URL] [--date YYYY-MM-DD] [--root PATH]\n  npm run amb -- run [--date YYYY-MM-DD] [--dry-run] [--no-local-ai] [--root PATH]\n  npm run amb -- bridge serve [--port 8765] [--root PATH]\n  npm run amb -- notebooklm open\n  npm run amb -- notebooklm inspect\n  npm run amb -- schedule write [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule install [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule uninstall [--root PATH]\n\n対象日の初期値は日本時間の前日です。`;
+  return `AI Morning Brief\n\n使い方:\n  npm run amb -- setup [--root PATH]\n  npm run amb -- doctor [--root PATH]\n  npm run amb -- add-x --image PATH [--url URL] [--date YYYY-MM-DD] [--root PATH]\n  npm run amb -- run [--date YYYY-MM-DD] [--dry-run] [--no-local-ai] [--no-collect] [--root PATH]\n  npm run amb -- bridge serve [--port 8765] [--root PATH]\n  npm run amb -- notebooklm open\n  npm run amb -- notebooklm inspect\n  npm run amb -- schedule write [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule install [--hour 5] [--minute 0] [--root PATH]\n  npm run amb -- schedule uninstall [--root PATH]\n\n対象日の初期値は日本時間の前日です。`;
 }
 
 function appRoot(options) {
@@ -59,6 +61,7 @@ async function getSettings(root, date) {
     ...defaults,
     ...stored,
     localAi: { ...defaults.localAi, ...(stored.localAi ?? {}) },
+    collection: { ...defaults.collection, ...(stored.collection ?? {}) },
     notebooklm: { ...defaults.notebooklm, ...(stored.notebooklm ?? {}) },
     schedule: { ...defaults.schedule, ...(stored.schedule ?? {}) },
     notifications: { ...defaults.notifications, ...(stored.notifications ?? {}) },
@@ -72,12 +75,20 @@ async function prepare(root, date, options = {}) {
   if (options['no-local-ai']) settings.localAi.enabled = false;
   const x = await ingestXImages(paths, date);
   const articles = await ingestManualArticles(paths, date);
-  const allCandidates = [...x, ...articles];
-  const { candidates, gemmaStatus } = await enrichCandidates(allCandidates, settings);
+  const collection = options['no-collect'] ? { candidates: [], errors: [] } : await collectPublicCandidates(date, settings);
+  await writeJson(path.join(paths.raw, 'public-collection.json'), collection);
+  const allCandidates = [...collection.candidates, ...x, ...articles];
+  // 収集元が増えても、Gemmaに渡すのは日次採用候補だけにする。
+  // これにより無料のローカルモデルを使いつつ、毎朝の実行時間を一定に保つ。
+  const shortlistedInputs = dedupeAndRank(
+    allCandidates.map((candidate) => ({ ...candidate, ...fallbackAnalysis(candidate) })),
+    settings
+  );
+  const { candidates, gemmaStatus } = await enrichCandidates(shortlistedInputs, settings);
   const selected = dedupeAndRank(candidates, settings);
   const output = await writeBrief(paths, date, selected, gemmaStatus);
   await writeJson(path.join(paths.daily, 'candidates.json'), candidates);
-  return { paths, settings, candidates, selected, output };
+  return { paths, settings, candidates, selected, output, collection };
 }
 
 async function doctor(root) {
@@ -132,11 +143,12 @@ async function main() {
   if (command === 'run') {
     const result = await prepare(root, date, options);
     console.log(`候補: ${result.candidates.length}件 / 選定: ${result.selected.length}件`);
+    console.log(`公開収集: ${result.collection.candidates.length}件 / 収集エラー: ${result.collection.errors.length}件`);
     console.log(`日次資料: ${result.output.digestFile}`);
     console.log(`Gemma: ${result.output.run.gemma.succeeded}/${result.output.run.gemma.attempted}件成功`);
     if (!options['dry-run'] && result.selected.length > 0) {
-      console.log('通常のChromeで日次資料をNotebookLMへ追加し、「音声解説を生成」を選んでください。');
-      await notify(result.settings, `${result.selected.length}件の日次資料を作成しました。NotebookLMへ追加できます。`);
+      console.log('Chrome拡張機能が日次資料をGemini Notebookへ投入し、音声解説の生成を依頼します。');
+      await notify(result.settings, `${result.selected.length}件の日次資料を作成しました。Gemini Notebookへの自動投入を開始できます。`);
     } else if (!options['dry-run']) {
       console.log('入力がないため、NotebookLMへ追加する資料はありません。');
       await notify(result.settings, '入力がなかったため、日次資料は0件です。');

@@ -1,6 +1,6 @@
 # AI Morning Brief
 
-無料・外部APIなしで、前日のAI関連情報をローカルで整理し、通常のChromeにあるGemini Notebookへ記事ごとに追加して音声解説を生成するmacOS向けツールです。
+無料で、前日のAI関連情報を収集・整理し、通常のChromeにあるGemini Notebookへ記事ごとに追加して音声解説を生成するmacOS向けツールです。認証情報や有料APIは使いません。
 
 ## 現在の実装範囲
 
@@ -8,14 +8,15 @@
 - Xスクリーンショットと投稿URLの受け入れ
 - macOS Vision OCRヘルパー（ローカル実行）
 - 手動投入した記事テキストの取り込み
-- Ollama上の`gemma4:12b-mlx`による根拠付きJSON要約（利用不可時はルールベースへ縮退）
+- 無料の公開ソース収集（GitHub公開検索、Hacker News公開検索、Google News RSS）
+- Ollama上の`gemma4:12b-mlx`による上位5件の日本語要約・分類（利用不可時はルールベースへ縮退）
 - 記事ごとのMarkdownと日次Markdownの生成
 - macOSの`launchd`による毎朝5時の自動実行
 - Chrome拡張機能による、新規Gemini Notebook作成・記事ごとのテキスト追加・音声解説生成リクエスト
 - ローカルブリッジの常時起動（`127.0.0.1`のみ）
 - 実行環境診断とドライラン
 
-Xをツールが自動巡回・撮影する機能は含めません。利用者が保存した画像を入力にします。
+Xをツールが自動巡回・撮影する機能は含めません。利用者が保存した画像を補助入力にします。公開収集はログイン不要の公開エンドポイントだけを利用し、APIキー・Cookie・アカウント情報は扱いません。
 
 ## クイックスタート
 
@@ -35,13 +36,15 @@ npm run amb -- add-x \
   --date 2026-08-25
 ```
 
-記事本文を手動で入れる場合は、`runtime/inbox/articles/YYYY-MM-DD/`へUTF-8の`.md`または`.txt`ファイルを保存します。
+記事本文を手動で入れる場合は、`runtime/inbox/articles/YYYY-MM-DD/`へUTF-8の`.md`または`.txt`ファイルを保存します。毎日の実行では公開ソースを自動収集し、X画像・手動記事は追加候補として併用します。
 
-NotebookLMを操作しないドライランは次の通りです。
+Gemini Notebookを操作しないドライランは次の通りです。
 
 ```bash
-npm run amb -- run --date 2026-08-25 --dry-run
+ npm run amb -- run --date 2026-08-25 --dry-run
 ```
+
+公開収集を使わずローカル入力だけを検証する場合は、`--no-collect`を付けます。Gemmaを使わずに速度優先で確認する場合は、`--no-local-ai`を付けます。
 
 生成物は`runtime/processed/YYYY-MM-DD/selected/`および`runtime/daily/YYYY-MM-DD/`へ保存されます。
 
@@ -63,7 +66,7 @@ npm run amb -- schedule uninstall
 
 `extension/`をChromeの「パッケージ化されていない拡張機能を読み込む」から登録します。通常のChromeでGemini Notebookへ一度ログインした状態で、拡張機能の「毎朝5時の自動実行を有効化」を押してください。
 
-毎朝5時に`launchd`が前日分を処理し、Chrome拡張機能が新規Notebookを作成します。選定記事を1件ずつテキストソースとして追加後、標準の音声解説生成を依頼します。Chromeが起動しており、Macがスリープしていないことが実行条件です。音声の完成時間はGemini Notebook側の処理状況に依存します。
+毎朝5時に`launchd`が前日分を処理し、Chrome拡張機能が新規Notebookを作成します。選定した最大30件を**1記事ずつ別々のテキストソース**として追加後、標準の音声解説生成を依頼します。Chromeが起動しており、Macがスリープしていないことが実行条件です。音声の完成時間はGemini Notebook側の処理状況に依存します。
 
 拡張機能はログイン情報・Cookieを取得、保存、移植しません。Googleの通常ログイン済みChromeセッションの画面操作のみを使います。
 

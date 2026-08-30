@@ -74,9 +74,18 @@ export function defaultSettings(root) {
       enabled: true,
       executable: 'ollama',
       model: 'gemma4:12b-mlx',
-      timeoutSeconds: 240,
+      baseUrl: 'http://127.0.0.1:11434',
+      timeoutSeconds: 90,
       temperature: 0.1,
+      maxItems: 5,
+      maxInputChars: 5_000,
       fallbackToRules: true
+    },
+    collection: {
+      enabled: true,
+      githubLimit: 10,
+      hackerNewsLimit: 10,
+      googleNewsPerQuery: 6
     },
     notebooklm: {
       language: 'Japanese',
