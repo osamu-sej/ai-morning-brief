@@ -31,7 +31,9 @@ function candidate({ date, sourceName, sourceType, title, url, text, capturedAt,
 }
 
 async function collectGitHub(date, limit) {
-  const query = encodeURIComponent(`(topic:artificial-intelligence OR topic:llm OR topic:generative-ai) pushed:>=${date}`);
+  // GitHub Searchは複雑なOR条件だと日付条件との組合せで0件になりやすいため、
+  // 広めのAI語と更新日で取得し、スター順で上位の公開リポジトリを採用する。
+  const query = encodeURIComponent(`AI pushed:>=${date}`);
   const response = await fetchWithTimeout(`https://api.github.com/search/repositories?q=${query}&sort=stars&order=desc&per_page=${limit}`, {
     headers: { accept: 'application/vnd.github+json' }
   });
