@@ -55,7 +55,19 @@ function inspectPage() {
 
 function findCreateButton() {
   const buttons = Array.from(document.querySelectorAll('button'));
-  return buttons.find((button) => /新規作成|Create new/i.test(normalized(button.innerText || button.getAttribute('aria-label'))));
+  const nativeButton = buttons.find((button) => /新規作成|Create new/i.test(normalized(button.innerText || button.getAttribute('aria-label'))));
+  if (nativeButton) return nativeButton;
+  const candidates = Array.from(document.querySelectorAll('[role="button"], [tabindex], *'))
+    .filter((item) => item.offsetParent)
+    .filter((item) => /新規作成|Create new/i.test(normalized(item.innerText || item.getAttribute('aria-label'))))
+    .map((item) => ({ item, rect: item.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width >= 80 && rect.height >= 28 && rect.width <= 650 && rect.height <= 180)
+    .sort((left, right) => {
+      const leftInteractive = left.item.matches('[role="button"], [tabindex]') ? 0 : 1;
+      const rightInteractive = right.item.matches('[role="button"], [tabindex]') ? 0 : 1;
+      return leftInteractive - rightInteractive || (left.rect.width * left.rect.height) - (right.rect.width * right.rect.height);
+    });
+  return candidates[0]?.item ?? null;
 }
 
 function findAddSourceButton() {
@@ -246,7 +258,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     sendResponse({ creationRequested: true });
-    button.click();
+    browserLevelClick(button).catch(() => button.click());
     return;
   }
   if (message?.type === 'amb:open-source-and-inspect') {
