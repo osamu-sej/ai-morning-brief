@@ -141,7 +141,7 @@ document.querySelector('#run-daily-now').addEventListener('click', () => {
 });
 
 document.querySelector('#enable-daily').addEventListener('click', () => {
-  showDailyResponse({ type: 'amb:enable-daily' }, '毎朝5時の自動実行を登録中…');
+  showDailyResponse({ type: 'amb:enable-daily' }, '毎朝5:10のGemini Notebook自動投入を登録中…');
 });
 
 document.querySelector('#daily-status').addEventListener('click', () => {

@@ -15,9 +15,10 @@ function previousTokyoDate(now = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
-function nextFiveAm(now = new Date()) {
+function nextNotebookAutomation(now = new Date()) {
   const next = new Date(now);
-  next.setHours(5, 0, 0, 0);
+  // 05:00のlaunchd収集・Gemma要約の完了を待ってから、最新の日次資料を読む。
+  next.setHours(5, 10, 0, 0);
   if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
   return next.getTime();
 }
@@ -130,7 +131,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return tab ? { tabId: tab.id, inactive: true } : { error: 'NotebookLMのタブを開いてから、もう一度実行してください。' };
     }
     if (message?.type === 'amb:enable-daily') {
-      chrome.alarms.create(DAILY_ALARM, { when: nextFiveAm(), periodInMinutes: 24 * 60 });
+      chrome.alarms.create(DAILY_ALARM, { when: nextNotebookAutomation(), periodInMinutes: 24 * 60 });
       const alarm = await chrome.alarms.get(DAILY_ALARM);
       const status = { state: 'scheduled', nextRunAt: alarm?.scheduledTime ?? null, updatedAt: new Date().toISOString() };
       await chrome.storage.local.set({ dailyStatus: status });
