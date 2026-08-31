@@ -1,5 +1,6 @@
 const NOTEBOOK_PATTERNS = ['https://notebooklm.google.com/*', 'https://notebook.google.com/*'];
 const NOTEBOOK_HOME_URL = 'https://notebook.google.com/';
+const GMAIL_INBOX_URL = 'https://mail.google.com/mail/u/0/#inbox';
 const BRIDGE = 'http://127.0.0.1:8765';
 const DAILY_ALARM = 'amb:daily-notebook';
 
@@ -77,7 +78,51 @@ async function sendWhenReady(tabId, message, isReady) {
     }
     await sleep(1000);
   }
-  throw new Error(`Notebook画面の読み込みを待機中に失敗しました: ${lastError?.message ?? 'timeout'}`);
+  throw new Error(`自動処理画面の読み込みを待機中に失敗しました: ${lastError?.message ?? 'timeout'}`);
+}
+
+function reportSubject(status) {
+  return `【AI Morning Brief】${status.expectedDate ?? '対象日未確定'} 実行結果`;
+}
+
+function reportBody(status) {
+  const state = status.state === 'requested' ? '完了（Notebookへの投入・音声生成依頼まで実行）'
+    : status.state === 'needs_attention' ? '一部未完了またはエラー'
+      : status.state ?? '不明';
+  const lines = [
+    'AI Morning Brief の自動実行結果です。',
+    '',
+    `対象日: ${status.expectedDate ?? '未確定'}`,
+    `状態: ${state}`,
+    `Notebookへ投入した記事数: ${status.sourceCount ?? 0}件`,
+    `音声解説の生成依頼: ${status.generationRequested ? '済み' : '未実行'}`
+  ];
+  if (status.notebookUrl) lines.push(`Notebook: ${status.notebookUrl}`);
+  if (status.error) lines.push(`エラー詳細: ${status.error}`);
+  lines.push('', 'このメールは、成功・一部成功・失敗のいずれの場合にも毎日送信されます。');
+  return lines.join('\n');
+}
+
+async function sendDailyReport(status) {
+  const tab = await chrome.tabs.create({ url: GMAIL_INBOX_URL, active: false });
+  const sent = await sendWhenReady(tab.id, {
+    type: 'amb:send-daily-report',
+    subject: reportSubject(status),
+    body: reportBody(status)
+  }, (url) => url?.startsWith('https://mail.google.com/'));
+  if (!sent?.ok) throw new Error(sent?.error ?? 'Gmailへの結果メールを送信できませんでした。');
+  return { state: 'sent', sentAt: new Date().toISOString() };
+}
+
+async function saveStatusAndReport(status) {
+  try {
+    status.email = await sendDailyReport(status);
+  } catch (error) {
+    status.email = { state: 'failed', error: error.message, attemptedAt: new Date().toISOString() };
+  }
+  status.updatedAt = new Date().toISOString();
+  await chrome.storage.local.set({ dailyStatus: status });
+  return status;
 }
 
 async function runDailyAutomation(trigger) {
@@ -104,12 +149,10 @@ async function runDailyAutomation(trigger) {
       error: result.error ?? null,
       updatedAt: new Date().toISOString()
     };
-    await chrome.storage.local.set({ dailyStatus: status });
-    return status;
+    return saveStatusAndReport(status);
   } catch (error) {
     const status = { state: 'needs_attention', trigger, expectedDate, error: error.message, updatedAt: new Date().toISOString() };
-    await chrome.storage.local.set({ dailyStatus: status });
-    return status;
+    return saveStatusAndReport(status);
   }
 }
 

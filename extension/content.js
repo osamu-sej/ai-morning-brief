@@ -211,6 +211,8 @@ async function requestAudioOverview() {
   if (!generate || generate.disabled) return { ok: false, error: '音声解説の設定画面または有効な「生成」ボタンが見つかりません。' };
   await browserLevelClick(generate);
   await new Promise((resolve) => window.setTimeout(resolve, 3000));
+  const limitMessage = normalized(document.body?.innerText).match(/音声解説の一日の上限に達しました[^\n]*/);
+  if (limitMessage) return { ok: false, error: limitMessage[0] };
   return { ok: true, generationRequested: true };
 }
 

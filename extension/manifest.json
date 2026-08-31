@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "AI Morning Brief NotebookLM",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "NotebookLMの認証済み通常Chromeタブで、AI Morning Briefの自動投入を実行します。",
   "permissions": ["storage", "alarms", "tabs", "debugger"],
   "host_permissions": [
     "https://notebooklm.google.com/*",
     "https://notebook.google.com/*",
+    "https://mail.google.com/*",
     "http://127.0.0.1:8765/*"
   ],
   "action": {
@@ -21,6 +22,11 @@
     {
       "matches": ["https://notebooklm.google.com/*", "https://notebook.google.com/*"],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["gmail.js"],
       "run_at": "document_idle"
     }
   ]
